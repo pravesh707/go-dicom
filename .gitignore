@@ -1,0 +1,21 @@
+# Binaries
+/bin/
+*.exe
+*.test
+*.out
+
+# Coverage
+coverage.out
+coverage.html
+
+# Go workspace / vendor
+/vendor/
+go.work
+go.work.sum
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+docs/

@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Verify tag matches the Version constant
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          ver="$(sed -nE 's/.*Version = "([0-9]+\.[0-9]+\.[0-9]+)".*/\1/p' version.go)"
+          echo "git tag    = $tag"
+          echo "version.go = $ver"
+          if [ "$tag" != "$ver" ]; then
+            echo "::error::tag v$tag does not match Version constant \"$ver\" in version.go"
+            exit 1
+          fi
+
+      - name: Test
+        run: go test -race ./...
+
+      - name: Build command-line tools
+        run: |
+          mkdir -p dist
+          commit="$(git rev-parse --short HEAD)"
+          for tool in echoscu echoscp; do
+            GOOS=linux  GOARCH=amd64 go build -ldflags "-X main.commit=$commit" -o "dist/${tool}-linux-amd64"  "./cmd/${tool}"
+            GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.commit=$commit" -o "dist/${tool}-darwin-arm64" "./cmd/${tool}"
+          done
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" ./dist/* --generate-notes --verify-tag
