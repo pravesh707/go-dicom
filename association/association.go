@@ -40,6 +40,14 @@ type Association struct {
 	CallingAETitle string
 	CalledAETitle  string
 
+	// localAETitle is this AE's own title (the acceptor side), used as the
+	// calling title for C-MOVE store sub-associations.
+	localAETitle string
+	// moveResolver maps a C-MOVE destination AE title to a "host:port" address.
+	moveResolver func(aeTitle string) (string, bool)
+	// moveStorageContexts are proposed to the C-MOVE destination.
+	moveStorageContexts []RequestedContext
+
 	mu        sync.Mutex
 	nextMsgID uint16
 	closed    bool

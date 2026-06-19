@@ -1,26 +1,31 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package godicom
+// Package tests holds the end-to-end / integration tests that exercise godicom
+// through its public API only. Package-internal unit tests live alongside the
+// code they test (Go requires white-box tests to share the package directory).
+package tests
 
 import (
 	"sync"
 	"testing"
+
+	godicom "github.com/pravesh707/go-dicom"
 )
 
 // TestCEchoInProcess starts an SCP, associates as an SCU, exchanges a C-ECHO,
 // and releases — the full vertical slice end to end.
 func TestCEchoInProcess(t *testing.T) {
-	scp := NewAE("ECHO_SCP")
-	scp.AddSupportedContext(VerificationSOPClass)
+	scp := godicom.NewAE("ECHO_SCP")
+	scp.AddSupportedContext(godicom.VerificationSOPClass)
 
 	var handled bool
-	srv, err := scp.StartServer("127.0.0.1:0", []HandlerBinding{
-		{Event: EvtCEcho, Handle: func(e *Event) Status {
+	srv, err := scp.StartServer("127.0.0.1:0", []godicom.HandlerBinding{
+		{Event: godicom.EvtCEcho, Handle: func(e *godicom.Event) godicom.Status {
 			handled = true
 			if e.Assoc.CallingAETitle != "ECHO_SCU" {
 				t.Errorf("calling AE = %q", e.Assoc.CallingAETitle)
 			}
-			return StatusSuccess
+			return godicom.StatusSuccess
 		}},
 	})
 	if err != nil {
@@ -28,8 +33,8 @@ func TestCEchoInProcess(t *testing.T) {
 	}
 	defer srv.Shutdown()
 
-	scu := NewAE("ECHO_SCU")
-	scu.AddRequestedContext(VerificationSOPClass)
+	scu := godicom.NewAE("ECHO_SCU")
+	scu.AddRequestedContext(godicom.VerificationSOPClass)
 
 	assoc, err := scu.Associate(srv.Addr().String())
 	if err != nil {
@@ -54,10 +59,10 @@ func TestCEchoInProcess(t *testing.T) {
 // SCP, exercising the goroutine-per-association server — the core motivation
 // for the Go port.
 func TestConcurrentAssociations(t *testing.T) {
-	scp := NewAE("ECHO_SCP")
-	scp.AddSupportedContext(VerificationSOPClass)
-	srv, err := scp.StartServer("127.0.0.1:0", []HandlerBinding{
-		{Event: EvtCEcho, Handle: func(e *Event) Status { return StatusSuccess }},
+	scp := godicom.NewAE("ECHO_SCP")
+	scp.AddSupportedContext(godicom.VerificationSOPClass)
+	srv, err := scp.StartServer("127.0.0.1:0", []godicom.HandlerBinding{
+		{Event: godicom.EvtCEcho, Handle: func(e *godicom.Event) godicom.Status { return godicom.StatusSuccess }},
 	})
 	if err != nil {
 		t.Fatalf("start server: %v", err)
@@ -71,8 +76,8 @@ func TestConcurrentAssociations(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			scu := NewAE("ECHO_SCU")
-			scu.AddRequestedContext(VerificationSOPClass)
+			scu := godicom.NewAE("ECHO_SCU")
+			scu.AddRequestedContext(godicom.VerificationSOPClass)
 			assoc, err := scu.Associate(srv.Addr().String())
 			if err != nil {
 				errs <- err
@@ -98,12 +103,10 @@ func TestConcurrentAssociations(t *testing.T) {
 	}
 }
 
-// TestAssociateRejectedNoContext verifies that an SCU requesting a context the
-// SCP does not support still associates, but finds no usable context for
-// C-ECHO. (The SCP accepts the association but rejects the presentation
-// context.)
+// TestAssociateNoCommonContext verifies that an SCU requesting a context the SCP
+// does not support still associates, but finds no usable context for C-ECHO.
 func TestAssociateNoCommonContext(t *testing.T) {
-	scp := NewAE("SCP")
+	scp := godicom.NewAE("SCP")
 	scp.AddSupportedContext("1.2.840.10008.5.1.4.1.1.2") // CT Storage only
 	srv, err := scp.StartServer("127.0.0.1:0", nil)
 	if err != nil {
@@ -111,8 +114,8 @@ func TestAssociateNoCommonContext(t *testing.T) {
 	}
 	defer srv.Shutdown()
 
-	scu := NewAE("SCU")
-	scu.AddRequestedContext(VerificationSOPClass)
+	scu := godicom.NewAE("SCU")
+	scu.AddRequestedContext(godicom.VerificationSOPClass)
 	assoc, err := scu.Associate(srv.Addr().String())
 	if err != nil {
 		t.Fatalf("associate: %v", err)

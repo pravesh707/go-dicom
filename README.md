@@ -11,8 +11,10 @@ package — with **no third-party dependencies**. The DICOM data layer (tags, VR
 data sets, the data dictionary, and the transfer-syntax codecs — the "pydicom"
 part) is implemented from scratch.
 
-Verification (C-ECHO) works **end to end as both SCU and SCP** and is verified to
-interoperate with pynetdicom 3.0.4 in both directions.
+All DIMSE-C services — **C-ECHO, C-STORE, C-FIND, C-MOVE, C-GET** — work as both
+SCU and SCP and are verified to interoperate with pynetdicom 3.0.4. The DIMSE-N
+services (N-GET/SET/ACTION/CREATE/DELETE/EVENT-REPORT) and DICOM Part-10 file
+read/write are implemented and tested in-process.
 
 - **Module path:** `github.com/pravesh707/go-dicom`
 - **Package name:** `godicom` — so you import the repo path but write `godicom.*`:
@@ -167,17 +169,25 @@ binaries under `cmd/`, docs under `docs/`. (Library packages are intentionally
 go-dicom/
 ├── doc.go, godicom.go, client.go, server.go   # high-level AE API (package godicom)
 ├── options.go, transport.go, version.go
-├── dicom/        # data sets, VRs, dictionary, transfer-syntax codecs
+├── dicom/        # data sets, VRs, dictionary, transfer-syntax codecs, Part-10 files
 ├── pdu/          # the 7 Upper Layer PDUs and their items
-├── dimse/        # DIMSE messages, command sets, status codes
-├── association/  # ACSE negotiation, DUL lifecycle, PDV framing, events
+├── dimse/        # DIMSE-C/N messages, command sets, status codes
+├── association/  # ACSE negotiation, DUL lifecycle, PDV framing, events, services
 ├── cmd/
-│   ├── echoscu/  # installable Verification SCU
-│   └── echoscp/  # installable Verification SCP
+│   ├── echoscu/  echoscp/   # Verification SCU/SCP
+│   ├── storescu/ storescp/  # Storage SCU/SCP
+│   ├── findscu/             # Query SCU
+│   └── qrscp/               # Query/Retrieve + Storage SCP (C-FIND/MOVE/GET/STORE)
+├── tests/        # end-to-end / integration tests (public-API only)
 ├── docs/ARCHITECTURE.md
 ├── LICENSE, NOTICE, CONTRIBUTING.md, Makefile
 └── .github/workflows/ci.yml
 ```
+
+Tests are split by kind: the integration tests live in `tests/`, while each
+package keeps its own white-box unit tests next to the code (Go requires tests
+that touch unexported identifiers to share the package directory). Run all of
+them with `go test ./...`.
 
 ## Why a Go port
 

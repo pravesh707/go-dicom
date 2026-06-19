@@ -118,8 +118,8 @@ func TestCEchoResponseCustomSOPClass(t *testing.T) {
 func TestDecodeUnknownCommandYieldsRawMessage(t *testing.T) {
 	ds := dicom.NewDataSet()
 	ds.Set(dicom.NewUI(dicom.TagAffectedSOPClassUID, "1.2.3"))
-	ds.Set(dicom.NewUS(dicom.TagCommandField, uint16(CMoveRQ))) // not registered
-	ds.Set(dicom.NewUS(dicom.TagCommandDataSetType, 0x0000))    // data set present
+	ds.Set(dicom.NewUS(dicom.TagCommandField, uint16(CCancelRQ))) // not registered
+	ds.Set(dicom.NewUS(dicom.TagCommandDataSetType, 0x0000))      // data set present
 	b, _ := dicom.EncodeCommandSet(ds)
 
 	msg, err := DecodeCommand(b)
@@ -130,7 +130,7 @@ func TestDecodeUnknownCommandYieldsRawMessage(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected RawMessage, got %T", msg)
 	}
-	if raw.CommandField() != CMoveRQ {
+	if raw.CommandField() != CCancelRQ {
 		t.Errorf("raw command = %s", raw.CommandField())
 	}
 	if !raw.HasDataSet() {

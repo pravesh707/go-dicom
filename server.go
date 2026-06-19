@@ -63,6 +63,8 @@ func (s *Server) handle(conn net.Conn) {
 		ImplementationClassUID:    s.ae.ImplementationClassUID,
 		ImplementationVersionName: s.ae.ImplementationVersionName,
 		RequireCalledAET:          s.ae.RequireCalledAET,
+		MoveResolver:              s.ae.moveResolver(),
+		MoveStorageContexts:       s.ae.moveStorageContexts(),
 	})
 	if err != nil {
 		return

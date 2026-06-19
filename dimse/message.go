@@ -80,6 +80,7 @@ type CEchoRequest struct {
 
 func (m *CEchoRequest) CommandField() CommandField { return CEchoRQ }
 func (m *CEchoRequest) HasDataSet() bool           { return false }
+func (m *CEchoRequest) GetMessageID() uint16       { return m.MessageID }
 
 func (m *CEchoRequest) CommandSet() *dicom.DataSet {
 	sop := m.AffectedSOPClassUID

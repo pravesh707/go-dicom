@@ -104,9 +104,9 @@ func TestServeUnhandledServiceAborts(t *testing.T) {
 	ctx, _ := a.contextForSyntax(verification)
 	ds := dicom.NewDataSet()
 	ds.Set(dicom.NewUI(dicom.TagAffectedSOPClassUID, "1.2.3"))
-	ds.Set(dicom.NewUS(dicom.TagCommandField, uint16(dimse.CMoveRQ)))
+	ds.Set(dicom.NewUS(dicom.TagCommandField, uint16(dimse.CCancelRQ)))
 	ds.Set(dicom.NewUS(dicom.TagCommandDataSetType, 0x0101))
-	raw := &dimse.RawMessage{Command: dimse.CMoveRQ, Set: ds}
+	raw := &dimse.RawMessage{Command: dimse.CCancelRQ, Set: ds}
 	go func() { _ = a.sendMessage(ctx, raw, nil) }()
 
 	select {

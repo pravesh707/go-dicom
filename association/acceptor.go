@@ -21,6 +21,13 @@ type AcceptParams struct {
 	ImplementationClassUID    string
 	ImplementationVersionName string
 	RequireCalledAET          bool
+
+	// MoveResolver maps a C-MOVE destination AE title to a "host:port" address.
+	// Required to serve C-MOVE.
+	MoveResolver func(aeTitle string) (string, bool)
+	// MoveStorageContexts are the presentation contexts proposed to the C-MOVE
+	// destination when forwarding matched instances.
+	MoveStorageContexts []RequestedContext
 }
 
 // Accept performs acceptor-side ACSE negotiation over conn. On success it
@@ -29,6 +36,9 @@ type AcceptParams struct {
 func Accept(conn net.Conn, p AcceptParams) (*Association, error) {
 	a := newAssociation(conn, false)
 	a.ourMaxLength = p.MaximumLength
+	a.localAETitle = p.AETitle
+	a.moveResolver = p.MoveResolver
+	a.moveStorageContexts = p.MoveStorageContexts
 
 	req, err := pdu.ReadPDU(a.reader)
 	if err != nil {
@@ -61,6 +71,20 @@ func Accept(conn net.Conn, p AcceptParams) (*Association, error) {
 		a.acceptedBySyntax[c.AbstractSyntax] = c
 	}
 
+	// Confirm any proposed SCP/SCU Role Selection for accepted abstract
+	// syntaxes, so the requestor may act as the SCP (e.g. receive instances
+	// during a C-GET). PS3.7 §D.3.3.4.
+	acceptedSyntax := make(map[string]bool, len(accepted))
+	for _, c := range accepted {
+		acceptedSyntax[c.AbstractSyntax] = true
+	}
+	var roles []pdu.RoleSelection
+	for _, rs := range rq.UserInformation.RoleSelection {
+		if acceptedSyntax[rs.SOPClassUID] {
+			roles = append(roles, pdu.RoleSelection{SOPClassUID: rs.SOPClassUID, SCURole: rs.SCURole, SCPRole: rs.SCPRole})
+		}
+	}
+
 	ac := &pdu.AssociateAC{
 		CalledAETitle:        rq.CalledAETitle,
 		CallingAETitle:       rq.CallingAETitle,
@@ -70,6 +94,7 @@ func Accept(conn net.Conn, p AcceptParams) (*Association, error) {
 			MaximumLength:             p.MaximumLength,
 			ImplementationClassUID:    p.ImplementationClassUID,
 			ImplementationVersionName: p.ImplementationVersionName,
+			RoleSelection:             roles,
 		},
 	}
 	if err := pdu.WritePDU(conn, ac); err != nil {
@@ -88,7 +113,7 @@ func (a *Association) Serve(bindings []HandlerBinding) error {
 	defer a.Close()
 
 	for {
-		ctx, msg, _, err := a.readMessage()
+		ctx, msg, data, err := a.readMessage()
 		if err != nil {
 			switch {
 			case errors.Is(err, errReleaseRequested):
@@ -104,26 +129,66 @@ func (a *Association) Serve(bindings []HandlerBinding) error {
 				return err
 			}
 		}
-		if err := a.dispatch(ht, ctx, msg); err != nil {
+		if err := a.dispatch(ht, ctx, msg, data); err != nil {
 			return err
 		}
 	}
 }
 
 // dispatch routes one inbound DIMSE request to its handler and sends the
-// response.
-func (a *Association) dispatch(ht *handlerTable, ctx AcceptedContext, msg dimse.Message) error {
+// response(s).
+func (a *Association) dispatch(ht *handlerTable, ctx AcceptedContext, msg dimse.Message, data *dicom.DataSet) error {
+	ht.emit(&Event{Type: EvtDIMSERecv, Assoc: a, Request: msg, DataSet: data})
+
 	switch req := msg.(type) {
 	case *dimse.CEchoRequest:
-		ht.emit(&Event{Type: EvtDIMSERecv, Assoc: a, Request: req})
 		ev := &Event{Type: EvtCEcho, Assoc: a, Context: ctx, Request: req}
 		status, _ := ht.handle(ev) // default is Success for verification
-		rsp := &dimse.CEchoResponse{
+		return a.sendMessage(ctx, &dimse.CEchoResponse{
 			MessageIDBeingRespondedTo: req.MessageID,
 			AffectedSOPClassUID:       req.AffectedSOPClassUID,
 			Status:                    status,
+		}, nil)
+
+	case *dimse.CStoreRequest:
+		ev := &Event{Type: EvtCStore, Assoc: a, Context: ctx, Request: req, DataSet: data}
+		status, handled := ht.handle(ev)
+		if !handled {
+			// No store handler bound — the peer's instance cannot be processed.
+			status = dimse.StatusRefusedSOPClassNotSupported
 		}
-		return a.sendMessage(ctx, rsp, nil)
+		return a.sendMessage(ctx, &dimse.CStoreResponse{
+			MessageIDBeingRespondedTo: req.MessageID,
+			AffectedSOPClassUID:       req.AffectedSOPClassUID,
+			AffectedSOPInstanceUID:    req.AffectedSOPInstanceUID,
+			Status:                    status,
+		}, nil)
+
+	case *dimse.CFindRequest:
+		ev := &Event{Type: EvtCFind, Assoc: a, Context: ctx, Request: req, DataSet: data}
+		ev.yield = func(identifier *dicom.DataSet) error {
+			return a.sendMessage(ctx, &dimse.CFindResponse{
+				MessageIDBeingRespondedTo: req.MessageID,
+				AffectedSOPClassUID:       req.AffectedSOPClassUID,
+				Status:                    dimse.StatusPending,
+				Identifier:                identifier,
+			}, identifier)
+		}
+		status, _ := ht.handle(ev) // default Success => empty result set
+		return a.sendMessage(ctx, &dimse.CFindResponse{
+			MessageIDBeingRespondedTo: req.MessageID,
+			AffectedSOPClassUID:       req.AffectedSOPClassUID,
+			Status:                    status,
+		}, nil)
+
+	case *dimse.CGetRequest:
+		return a.dispatchCGet(ht, ctx, req, data)
+
+	case *dimse.CMoveRequest:
+		return a.dispatchCMove(ht, ctx, req, data)
+
+	case *dimse.NRequest:
+		return a.dispatchN(ht, ctx, req, data)
 
 	default:
 		// No typed handler for this DIMSE service. Abort cleanly rather than
