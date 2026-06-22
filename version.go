@@ -5,7 +5,7 @@ package godicom
 // Version is the semantic version of the godicom library and the single source
 // of truth for releases. Bump it, then tag the commit `vX.Y.Z`; the release
 // workflow verifies the tag matches this constant.
-const Version = "1.0.0"
+const Version = "1.0.1"
 
 // VersionString returns the version, appending "+<commit>" when a non-empty
 // build commit is supplied (commands inject it via -ldflags "-X main.commit=…").

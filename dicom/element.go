@@ -23,7 +23,7 @@ type Element struct {
 // NewElement builds an element from raw little-endian bytes, padding to even
 // length using the VR's pad byte.
 func NewElement(tag Tag, vr VR, raw []byte) *Element {
-	return &Element{Tag: tag, VR: vr, Raw: padEven(raw, vr.padByte())}
+	return &Element{Tag: tag, VR: vr, Raw: padEven(raw, vr.PadByte())}
 }
 
 // NewUS builds an Unsigned Short (US) element from one or more uint16 values.
@@ -53,7 +53,7 @@ func NewUI(tag Tag, uid string) *Element {
 // using that VR's pad byte. Multiple values are joined with backslash.
 func NewString(tag Tag, vr VR, values ...string) *Element {
 	s := strings.Join(values, `\`)
-	return &Element{Tag: tag, VR: vr, Raw: padEven([]byte(s), vr.padByte())}
+	return &Element{Tag: tag, VR: vr, Raw: padEven([]byte(s), vr.PadByte())}
 }
 
 // Uint16 returns the first value decoded as a uint16.
@@ -98,6 +98,11 @@ func (e *Element) Strings() []string {
 
 // Len returns the encoded value length in bytes (always even).
 func (e *Element) Len() int { return len(e.Raw) }
+
+// UndefinedLength reports whether the element was encoded with undefined length
+// (0xFFFFFFFF) — sequences and encapsulated pixel data, whose Raw holds the full
+// item stream including the closing delimitation item.
+func (e *Element) UndefinedLength() bool { return e.undefined }
 
 func padEven(b []byte, pad byte) []byte {
 	if len(b)%2 == 0 {

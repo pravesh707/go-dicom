@@ -41,6 +41,7 @@ func Request(conn net.Conn, p RequestParams) (*Association, error) {
 	a.CalledAETitle = p.CalledAETitle
 
 	var pcs []pdu.PresentationContextRQ
+	var roles []pdu.RoleSelection
 	ctxByID := make(map[byte]RequestedContext)
 	id := byte(1) // presentation context IDs are odd
 	for _, rc := range p.RequestedContexts {
@@ -49,6 +50,13 @@ func Request(conn net.Conn, p RequestParams) (*Association, error) {
 			AbstractSyntax:   rc.AbstractSyntax,
 			TransferSyntaxes: rc.TransferSyntaxes,
 		})
+		if rc.ScuRole || rc.ScpRole {
+			roles = append(roles, pdu.RoleSelection{
+				SOPClassUID: rc.AbstractSyntax,
+				SCURole:     rc.ScuRole,
+				SCPRole:     rc.ScpRole,
+			})
+		}
 		ctxByID[id] = rc
 		id += 2
 	}
@@ -62,6 +70,7 @@ func Request(conn net.Conn, p RequestParams) (*Association, error) {
 			MaximumLength:             p.MaximumLength,
 			ImplementationClassUID:    p.ImplementationClassUID,
 			ImplementationVersionName: p.ImplementationVersionName,
+			RoleSelection:             roles,
 		},
 	}
 	if err := pdu.WritePDU(conn, rq); err != nil {

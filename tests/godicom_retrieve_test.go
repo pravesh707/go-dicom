@@ -71,6 +71,57 @@ func TestCGetInProcess(t *testing.T) {
 	}
 }
 
+// TestCGetWithScpRoleNegotiation exercises the public C-GET path with SCP/SCU
+// Role Selection on the storage context — the negotiation a standards-strict
+// C-GET SCP (e.g. pynetdicom) requires before it will return instances.
+func TestCGetWithScpRoleNegotiation(t *testing.T) {
+	model := godicom.StudyRootQueryRetrieveGet
+
+	scp := godicom.NewAE("GET_SCP")
+	scp.AddSupportedContext(model)
+	scp.AddSupportedContext(scImageStorage)
+	srv, err := scp.StartServer("127.0.0.1:0", []godicom.HandlerBinding{
+		{Event: godicom.EvtCGet, Handle: func(e *godicom.Event) godicom.Status {
+			if err := e.Yield(makeInstance("2.1")); err != nil {
+				return godicom.Status(0xC000)
+			}
+			return godicom.StatusSuccess
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Shutdown()
+
+	scu := godicom.NewAE("GET_SCU")
+	scu.AddRequestedContext(model)
+	// Propose SCP role for the storage context so the peer may store back to us.
+	scu.AddRequestedContextWithRole(scImageStorage, false, true)
+	assoc, err := scu.Associate(srv.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer assoc.Release()
+
+	var got []string
+	query := dicom.NewDataSet()
+	query.Set(dicom.NewString(dicom.TagQueryRetrieveLevel, dicom.VRCS, "STUDY"))
+	res, err := assoc.SendCGet(model, query, func(ds *dicom.DataSet) godicom.Status {
+		uid, _ := ds.GetString(dicom.TagSOPInstanceUID)
+		got = append(got, uid)
+		return godicom.StatusSuccess
+	})
+	if err != nil {
+		t.Fatalf("c-get: %v", err)
+	}
+	if !res.Status.IsSuccess() || res.Completed != 1 || res.Failed != 0 {
+		t.Errorf("result status=%#x completed=%d failed=%d, want success 1/0", uint16(res.Status), res.Completed, res.Failed)
+	}
+	if len(got) != 1 || got[0] != "2.1" {
+		t.Errorf("received instances = %v, want [2.1]", got)
+	}
+}
+
 func TestCMoveInProcess(t *testing.T) {
 	// Destination Storage SCP that records received instances.
 	var mu sync.Mutex

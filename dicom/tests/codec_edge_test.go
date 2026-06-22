@@ -1,27 +1,29 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package dicom
+package tests
 
 import (
 	"bytes"
 	"encoding/binary"
 	"testing"
+
+	"github.com/pravesh707/go-dicom/dicom"
 )
 
 func le16(v uint16) []byte { b := make([]byte, 2); binary.LittleEndian.PutUint16(b, v); return b }
 func le32(v uint32) []byte { b := make([]byte, 4); binary.LittleEndian.PutUint32(b, v); return b }
 
 func TestEmptyDataSetRoundTrip(t *testing.T) {
-	ds := NewDataSet()
-	for _, ts := range []string{ImplicitVRLittleEndian, ExplicitVRLittleEndian} {
-		b, err := Encode(ds, ts)
+	ds := dicom.NewDataSet()
+	for _, ts := range []string{dicom.ImplicitVRLittleEndian, dicom.ExplicitVRLittleEndian} {
+		b, err := dicom.Encode(ds, ts)
 		if err != nil {
 			t.Fatalf("encode empty: %v", err)
 		}
 		if len(b) != 0 {
 			t.Errorf("empty dataset encoded to %d bytes", len(b))
 		}
-		got, err := Decode(b, ts)
+		got, err := dicom.Decode(b, ts)
 		if err != nil || got.Len() != 0 {
 			t.Errorf("decode empty: len=%d err=%v", got.Len(), err)
 		}
@@ -29,33 +31,33 @@ func TestEmptyDataSetRoundTrip(t *testing.T) {
 }
 
 func TestExplicitLongLengthVRRoundTrip(t *testing.T) {
-	ds := NewDataSet()
-	ds.Set(NewElement(Tag{0x7FE0, 0x0010}, VROW, []byte{0x01, 0x02, 0x03, 0x04}))
-	ds.Set(NewElement(Tag{0x0009, 0x0001}, VRUN, []byte{0xAA, 0xBB}))
+	ds := dicom.NewDataSet()
+	ds.Set(dicom.NewElement(dicom.NewTag(0x7FE0, 0x0010), dicom.VROW, []byte{0x01, 0x02, 0x03, 0x04}))
+	ds.Set(dicom.NewElement(dicom.NewTag(0x0009, 0x0001), dicom.VRUN, []byte{0xAA, 0xBB}))
 
-	b, err := Encode(ds, ExplicitVRLittleEndian)
+	b, err := dicom.Encode(ds, dicom.ExplicitVRLittleEndian)
 	if err != nil {
 		t.Fatalf("encode: %v", err)
 	}
-	got, err := Decode(b, ExplicitVRLittleEndian)
+	got, err := dicom.Decode(b, dicom.ExplicitVRLittleEndian)
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	e, ok := got.Get(Tag{0x7FE0, 0x0010})
-	if !ok || e.VR != VROW || !bytes.Equal(e.Raw, []byte{1, 2, 3, 4}) {
+	e, ok := got.Get(dicom.NewTag(0x7FE0, 0x0010))
+	if !ok || e.VR != dicom.VROW || !bytes.Equal(e.Raw, []byte{1, 2, 3, 4}) {
 		t.Errorf("OW element = %+v", e)
 	}
 }
 
 func TestExplicitShortLengthOverflowErrors(t *testing.T) {
-	ds := NewDataSet()
+	ds := dicom.NewDataSet()
 	// PN uses a 2-byte length in Explicit VR; a value > 0xFFFF cannot be encoded.
-	ds.Set(NewElement(Tag{0x0010, 0x0010}, VRPN, make([]byte, 0x10000)))
-	if _, err := Encode(ds, ExplicitVRLittleEndian); err == nil {
+	ds.Set(dicom.NewElement(dicom.NewTag(0x0010, 0x0010), dicom.VRPN, make([]byte, 0x10000)))
+	if _, err := dicom.Encode(ds, dicom.ExplicitVRLittleEndian); err == nil {
 		t.Error("expected overflow error for explicit short-length VR")
 	}
 	// Implicit VR uses a 4-byte length, so the same value is fine.
-	if _, err := Encode(ds, ImplicitVRLittleEndian); err != nil {
+	if _, err := dicom.Encode(ds, dicom.ImplicitVRLittleEndian); err != nil {
 		t.Errorf("implicit encode should succeed: %v", err)
 	}
 }
@@ -73,18 +75,18 @@ func TestUndefinedLengthSequenceRoundTrip(t *testing.T) {
 	s = append(s, le16(0xE0DD)...)
 	s = append(s, le32(0)...)
 
-	ds, err := Decode(s, ImplicitVRLittleEndian)
+	ds, err := dicom.Decode(s, dicom.ImplicitVRLittleEndian)
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	e, ok := ds.Get(Tag{0x0008, 0x1140})
+	e, ok := ds.Get(dicom.NewTag(0x0008, 0x1140))
 	if !ok {
 		t.Fatal("sequence element missing")
 	}
-	if !e.undefined {
+	if !e.UndefinedLength() {
 		t.Error("element should be marked undefined-length")
 	}
-	reenc, err := Encode(ds, ImplicitVRLittleEndian)
+	reenc, err := dicom.Encode(ds, dicom.ImplicitVRLittleEndian)
 	if err != nil {
 		t.Fatalf("re-encode: %v", err)
 	}
@@ -112,11 +114,11 @@ func TestUndefinedLengthNestedItemRoundTrip(t *testing.T) {
 	s = append(s, le16(0xE0DD)...)
 	s = append(s, le32(0)...)
 
-	ds, err := Decode(s, ImplicitVRLittleEndian)
+	ds, err := dicom.Decode(s, dicom.ImplicitVRLittleEndian)
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	reenc, err := Encode(ds, ImplicitVRLittleEndian)
+	reenc, err := dicom.Encode(ds, dicom.ImplicitVRLittleEndian)
 	if err != nil {
 		t.Fatalf("re-encode: %v", err)
 	}
@@ -132,19 +134,19 @@ func TestDecodeTruncatedErrors(t *testing.T) {
 		append(append(le16(0x0008), le16(0x0018)...), append(le32(10), 0x41, 0x42)...), // value short
 	}
 	for i, c := range cases {
-		if _, err := Decode(c, ImplicitVRLittleEndian); err == nil {
+		if _, err := dicom.Decode(c, dicom.ImplicitVRLittleEndian); err == nil {
 			t.Errorf("case %d: expected truncation error", i)
 		}
 	}
 }
 
 func TestUnknownTransferSyntaxErrors(t *testing.T) {
-	ds := NewDataSet()
-	ds.Set(NewUS(Tag{0x0028, 0x0010}, 1))
-	if _, err := Encode(ds, "1.2.840.10008.1.2.99.bogus"); err == nil {
+	ds := dicom.NewDataSet()
+	ds.Set(dicom.NewUS(dicom.NewTag(0x0028, 0x0010), 1))
+	if _, err := dicom.Encode(ds, "1.2.840.10008.1.2.99.bogus"); err == nil {
 		t.Error("encode with unknown TS should error")
 	}
-	if _, err := Decode([]byte{0x01}, "1.2.840.10008.1.2.99.bogus"); err == nil {
+	if _, err := dicom.Decode([]byte{0x01}, "1.2.840.10008.1.2.99.bogus"); err == nil {
 		t.Error("decode with unknown TS should error")
 	}
 }
@@ -152,26 +154,26 @@ func TestUnknownTransferSyntaxErrors(t *testing.T) {
 // fakeCodec is a no-op Codec used to test the registry.
 type fakeCodec struct{ uid string }
 
-func (f fakeCodec) TransferSyntaxUID() string       { return f.uid }
-func (f fakeCodec) Implicit() bool                  { return false }
-func (f fakeCodec) Encode(*DataSet) ([]byte, error) { return []byte{0xEE}, nil }
-func (f fakeCodec) Decode([]byte) (*DataSet, error) { return NewDataSet(), nil }
+func (f fakeCodec) TransferSyntaxUID() string             { return f.uid }
+func (f fakeCodec) Implicit() bool                        { return false }
+func (f fakeCodec) Encode(*dicom.DataSet) ([]byte, error) { return []byte{0xEE}, nil }
+func (f fakeCodec) Decode([]byte) (*dicom.DataSet, error) { return dicom.NewDataSet(), nil }
 
 func TestCodecRegistry(t *testing.T) {
-	c, ok := CodecFor(ImplicitVRLittleEndian)
+	c, ok := dicom.CodecFor(dicom.ImplicitVRLittleEndian)
 	if !ok || !c.Implicit() {
 		t.Error("implicit codec lookup failed")
 	}
-	c, ok = CodecFor(ExplicitVRLittleEndian)
+	c, ok = dicom.CodecFor(dicom.ExplicitVRLittleEndian)
 	if !ok || c.Implicit() {
 		t.Error("explicit codec lookup failed")
 	}
-	if _, ok := CodecFor("totally-unregistered"); ok {
+	if _, ok := dicom.CodecFor("totally-unregistered"); ok {
 		t.Error("unregistered TS should not resolve")
 	}
 
-	RegisterCodec(fakeCodec{uid: "1.2.3.fake"})
-	out, err := Encode(NewDataSet(), "1.2.3.fake")
+	dicom.RegisterCodec(fakeCodec{uid: "1.2.3.fake"})
+	out, err := dicom.Encode(dicom.NewDataSet(), "1.2.3.fake")
 	if err != nil || !bytes.Equal(out, []byte{0xEE}) {
 		t.Errorf("fake codec not used: out=%x err=%v", out, err)
 	}

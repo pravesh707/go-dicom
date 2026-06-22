@@ -15,6 +15,14 @@ import "github.com/pravesh707/go-dicom/pdu"
 type RequestedContext struct {
 	AbstractSyntax   string
 	TransferSyntaxes []string
+
+	// ScuRole and ScpRole propose SCP/SCU Role Selection (PS3.7 §D.3.3.4). When
+	// both are false no role-selection sub-item is sent and the requestor
+	// defaults to the SCU role. Set ScpRole on the storage contexts of a C-GET
+	// so the peer (the C-GET SCP) may act as the Storage SCU and return matched
+	// instances as C-STORE sub-operations over this same association.
+	ScuRole bool
+	ScpRole bool
 }
 
 // SupportedContext is an abstract syntax that an acceptor (SCP) will accept,

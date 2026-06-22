@@ -86,7 +86,7 @@ func parseElement(c *cursor, implicit bool) (*Element, error) {
 			return nil, err
 		}
 		vr = VR(vrBytes)
-		if vr.usesLongLength() {
+		if vr.UsesLongLength() {
 			if _, err = c.take(2); err != nil { // reserved
 				return nil, err
 			}

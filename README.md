@@ -170,24 +170,31 @@ go-dicom/
 ├── doc.go, godicom.go, client.go, server.go   # high-level AE API (package godicom)
 ├── options.go, transport.go, version.go
 ├── dicom/        # data sets, VRs, dictionary, transfer-syntax codecs, Part-10 files
+│   └── tests/    #   its package tests
 ├── pdu/          # the 7 Upper Layer PDUs and their items
+│   └── tests/
 ├── dimse/        # DIMSE-C/N messages, command sets, status codes
+│   └── tests/
 ├── association/  # ACSE negotiation, DUL lifecycle, PDV framing, events, services
+│   └── tests/
 ├── cmd/
 │   ├── echoscu/  echoscp/   # Verification SCU/SCP
 │   ├── storescu/ storescp/  # Storage SCU/SCP
 │   ├── findscu/             # Query SCU
 │   └── qrscp/               # Query/Retrieve + Storage SCP (C-FIND/MOVE/GET/STORE)
-├── tests/        # end-to-end / integration tests (public-API only)
+├── tests/        # end-to-end / integration tests for the top-level godicom API
 ├── docs/ARCHITECTURE.md
 ├── LICENSE, NOTICE, CONTRIBUTING.md, Makefile
 └── .github/workflows/ci.yml
 ```
 
-Tests are split by kind: the integration tests live in `tests/`, while each
-package keeps its own white-box unit tests next to the code (Go requires tests
-that touch unexported identifiers to share the package directory). Run all of
-them with `go test ./...`.
+Every package's tests live in a `tests/` subdirectory and exercise the package
+through its exported API. Where a test needs a package internal, that package
+exposes a thin, documented seam (for example `dicom.VR.UsesLongLength` or, for
+the association framing layer, `association/export.go`). The only `_test.go`
+left beside the code is the root `example_test.go`, a runnable godoc example
+that must sit in the package directory to render on pkg.go.dev. Run everything
+with `go test ./...`.
 
 ## Why a Go port
 

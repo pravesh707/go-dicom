@@ -162,6 +162,23 @@ func (ae *AE) AddRequestedContext(abstractSyntax string, transferSyntaxes ...str
 	})
 }
 
+// AddRequestedContextWithRole adds an SCU presentation context that also
+// proposes SCP/SCU Role Selection (PS3.7 §D.3.3.4). Use it for the storage
+// contexts of a C-GET — set scpRole true so the peer may return matched
+// instances over the same association. With no transfer syntaxes,
+// DefaultTransferSyntaxes is used.
+func (ae *AE) AddRequestedContextWithRole(abstractSyntax string, scuRole, scpRole bool, transferSyntaxes ...string) {
+	if len(transferSyntaxes) == 0 {
+		transferSyntaxes = DefaultTransferSyntaxes
+	}
+	ae.requested = append(ae.requested, RequestedContext{
+		AbstractSyntax:   abstractSyntax,
+		TransferSyntaxes: transferSyntaxes,
+		ScuRole:          scuRole,
+		ScpRole:          scpRole,
+	})
+}
+
 // AddSupportedContext adds a presentation context to accept when acting as an
 // SCP. With no transfer syntaxes, DefaultTransferSyntaxes is used.
 func (ae *AE) AddSupportedContext(abstractSyntax string, transferSyntaxes ...string) {

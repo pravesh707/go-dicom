@@ -1,29 +1,29 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package association
+package tests
 
 import (
 	"net"
 	"testing"
 	"time"
 
+	"github.com/pravesh707/go-dicom/association"
 	"github.com/pravesh707/go-dicom/dicom"
 	"github.com/pravesh707/go-dicom/dimse"
-	"github.com/pravesh707/go-dicom/pdu"
 )
 
 // establishPair returns a connected requestor/acceptor association pair over an
 // in-memory pipe, with the Verification context negotiated.
-func establishPair(t *testing.T) (requestor, acceptor *Association) {
+func establishPair(t *testing.T) (requestor, acceptor *association.Association) {
 	t.Helper()
 	client, server := net.Pipe()
 
-	ch := make(chan *Association, 1)
+	ch := make(chan *association.Association, 1)
 	go func() {
-		a, err := Request(client, RequestParams{
+		a, err := association.Request(client, association.RequestParams{
 			CallingAETitle:    "SCU",
 			CalledAETitle:     "SCP",
-			RequestedContexts: []RequestedContext{{AbstractSyntax: verification, TransferSyntaxes: []string{dicom.ImplicitVRLittleEndian}}},
+			RequestedContexts: []association.RequestedContext{{AbstractSyntax: verification, TransferSyntaxes: []string{dicom.ImplicitVRLittleEndian}}},
 			MaximumLength:     16384,
 		})
 		if err != nil {
@@ -32,9 +32,9 @@ func establishPair(t *testing.T) (requestor, acceptor *Association) {
 		ch <- a
 	}()
 
-	b, err := Accept(server, AcceptParams{
+	b, err := association.Accept(server, association.AcceptParams{
 		AETitle:           "SCP",
-		SupportedContexts: []SupportedContext{{AbstractSyntax: verification, TransferSyntaxes: []string{dicom.ImplicitVRLittleEndian}}},
+		SupportedContexts: []association.SupportedContext{{AbstractSyntax: verification, TransferSyntaxes: []string{dicom.ImplicitVRLittleEndian}}},
 		MaximumLength:     16384,
 	})
 	if err != nil {
@@ -49,10 +49,10 @@ func TestServeCEchoAndRelease(t *testing.T) {
 	var established, released, gotEcho bool
 	serveDone := make(chan error, 1)
 	go func() {
-		serveDone <- b.Serve([]HandlerBinding{
-			{Event: EvtEstablished, Handle: func(*Event) dimse.Status { established = true; return dimse.StatusSuccess }},
-			{Event: EvtReleased, Handle: func(*Event) dimse.Status { released = true; return dimse.StatusSuccess }},
-			{Event: EvtCEcho, Handle: func(e *Event) dimse.Status {
+		serveDone <- b.Serve([]association.HandlerBinding{
+			{Event: association.EvtEstablished, Handle: func(*association.Event) dimse.Status { established = true; return dimse.StatusSuccess }},
+			{Event: association.EvtReleased, Handle: func(*association.Event) dimse.Status { released = true; return dimse.StatusSuccess }},
+			{Event: association.EvtCEcho, Handle: func(e *association.Event) dimse.Status {
 				gotEcho = true
 				if e.MessageID() == 0 {
 					t.Error("echo event missing message id")
@@ -91,7 +91,7 @@ func TestServeUnhandledServiceAborts(t *testing.T) {
 	// block on the synchronous pipe.
 	go func() {
 		for {
-			if _, err := pdu.ReadPDU(a.reader); err != nil {
+			if _, err := a.ReadPDU(); err != nil {
 				return
 			}
 		}
@@ -100,14 +100,14 @@ func TestServeUnhandledServiceAborts(t *testing.T) {
 	serveDone := make(chan error, 1)
 	go func() { serveDone <- b.Serve(nil) }()
 
-	// Send an unregistered DIMSE service (C-MOVE) the server cannot handle.
-	ctx, _ := a.contextForSyntax(verification)
+	// Send an unregistered DIMSE service (C-CANCEL) the server cannot handle.
+	ctx, _ := a.ContextForSyntax(verification)
 	ds := dicom.NewDataSet()
 	ds.Set(dicom.NewUI(dicom.TagAffectedSOPClassUID, "1.2.3"))
 	ds.Set(dicom.NewUS(dicom.TagCommandField, uint16(dimse.CCancelRQ)))
 	ds.Set(dicom.NewUS(dicom.TagCommandDataSetType, 0x0101))
 	raw := &dimse.RawMessage{Command: dimse.CCancelRQ, Set: ds}
-	go func() { _ = a.sendMessage(ctx, raw, nil) }()
+	go func() { _ = a.SendMessage(ctx, raw, nil) }()
 
 	select {
 	case err := <-serveDone:
@@ -142,7 +142,7 @@ func TestAbortClosesConnection(t *testing.T) {
 	// Drain the peer so the A-ABORT write does not block on the pipe.
 	go func() {
 		for {
-			if _, err := pdu.ReadPDU(b.reader); err != nil {
+			if _, err := b.ReadPDU(); err != nil {
 				return
 			}
 		}

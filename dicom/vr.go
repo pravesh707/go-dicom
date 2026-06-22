@@ -44,10 +44,10 @@ const (
 	VRUV VR = "UV" // Unsigned Very Long
 )
 
-// usesLongLength reports whether, in the Explicit VR encoding, this VR is
+// UsesLongLength reports whether, in the Explicit VR encoding, this VR is
 // written with a 2-byte reserved field followed by a 4-byte length (true), or
 // a plain 2-byte length (false). PS3.5 §7.1.2.
-func (vr VR) usesLongLength() bool {
+func (vr VR) UsesLongLength() bool {
 	switch vr {
 	case VROB, VROD, VROF, VROL, VROV, VROW, VRSQ, VRUC, VRUN, VRUR, VRUT, VRSV, VRUV:
 		return true
@@ -55,9 +55,9 @@ func (vr VR) usesLongLength() bool {
 	return false
 }
 
-// padByte is the byte used to pad odd-length values to even length. Text-like
+// PadByte is the byte used to pad odd-length values to even length. Text-like
 // VRs pad with a space; UI pads with NUL; binary/unknown pad with NUL.
-func (vr VR) padByte() byte {
+func (vr VR) PadByte() byte {
 	switch vr {
 	case VRUI:
 		return 0x00
@@ -69,9 +69,9 @@ func (vr VR) padByte() byte {
 	}
 }
 
-// isString reports whether the VR carries a (possibly multi-valued, backslash
+// IsString reports whether the VR carries a (possibly multi-valued, backslash
 // separated) text value rather than raw binary.
-func (vr VR) isString() bool {
+func (vr VR) IsString() bool {
 	switch vr {
 	case VRAE, VRAS, VRCS, VRDA, VRDS, VRDT, VRIS, VRLO, VRLT, VRPN, VRSH, VRST,
 		VRTM, VRUC, VRUI, VRUR, VRUT:

@@ -138,7 +138,7 @@ func encodeElement(buf *bytes.Buffer, e *Element, implicit bool) error {
 		vr = VRUN
 	}
 	buf.WriteString(string(vr))
-	if vr.usesLongLength() {
+	if vr.UsesLongLength() {
 		buf.Write([]byte{0x00, 0x00}) // reserved
 		var l [4]byte
 		binary.LittleEndian.PutUint32(l[:], length)

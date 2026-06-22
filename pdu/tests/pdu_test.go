@@ -1,29 +1,34 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package pdu
+// Package tests holds the pdu package's tests. They exercise the package
+// through its exported API (black box), so they live in this subdirectory
+// rather than alongside the code.
+package tests
 
 import (
 	"bytes"
 	"testing"
+
+	"github.com/pravesh707/go-dicom/pdu"
 )
 
 func TestAssociateRQRoundTrip(t *testing.T) {
-	rq := &AssociateRQ{
+	rq := &pdu.AssociateRQ{
 		CalledAETitle:      "STORE_SCP",
 		CallingAETitle:     "ECHO_SCU",
 		ApplicationContext: "1.2.840.10008.3.1.1.1",
-		PresentationContexts: []PresentationContextRQ{
+		PresentationContexts: []pdu.PresentationContextRQ{
 			{ID: 1, AbstractSyntax: "1.2.840.10008.1.1", TransferSyntaxes: []string{
 				"1.2.840.10008.1.2", "1.2.840.10008.1.2.1",
 			}},
 		},
-		UserInformation: UserInformation{
+		UserInformation: pdu.UserInformation{
 			MaximumLength:             16384,
 			ImplementationClassUID:    "1.2.826.0.1.3680043.10.1337.1",
 			ImplementationVersionName: "GODICOM_0_1",
 		},
 	}
-	rq.UserInformation.RoleSelection = []RoleSelection{
+	rq.UserInformation.RoleSelection = []pdu.RoleSelection{
 		{SOPClassUID: "1.2.840.10008.5.1.4.1.1.2", SCURole: true, SCPRole: true},
 	}
 
@@ -31,15 +36,15 @@ func TestAssociateRQRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encode: %v", err)
 	}
-	if encoded[0] != TypeAssociateRQ {
+	if encoded[0] != pdu.TypeAssociateRQ {
 		t.Fatalf("pdu type = %#x", encoded[0])
 	}
 
-	decoded, err := ReadPDU(bytes.NewReader(encoded))
+	decoded, err := pdu.ReadPDU(bytes.NewReader(encoded))
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
-	got, ok := decoded.(*AssociateRQ)
+	got, ok := decoded.(*pdu.AssociateRQ)
 	if !ok {
 		t.Fatalf("decoded type = %T", decoded)
 	}
@@ -62,18 +67,18 @@ func TestAssociateRQRoundTrip(t *testing.T) {
 
 func TestPDataTFRoundTrip(t *testing.T) {
 	cmd := []byte{0x01, 0x02, 0x03, 0x04}
-	p := &PDataTF{PDVs: []PDV{
+	p := &pdu.PDataTF{PDVs: []pdu.PDV{
 		{ContextID: 1, IsCommand: true, IsLast: true, Data: cmd},
 	}}
 	encoded, err := p.Encode()
 	if err != nil {
 		t.Fatalf("encode: %v", err)
 	}
-	decoded, err := ReadPDU(bytes.NewReader(encoded))
+	decoded, err := pdu.ReadPDU(bytes.NewReader(encoded))
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
-	got := decoded.(*PDataTF)
+	got := decoded.(*pdu.PDataTF)
 	if len(got.PDVs) != 1 {
 		t.Fatalf("pdv count = %d", len(got.PDVs))
 	}
@@ -84,12 +89,12 @@ func TestPDataTFRoundTrip(t *testing.T) {
 }
 
 func TestControlPDUs(t *testing.T) {
-	for _, p := range []PDU{&ReleaseRQ{}, &ReleaseRP{}, &Abort{Source: AbortSourceServiceUser, Reason: AbortReasonNotSpecified}} {
+	for _, p := range []pdu.PDU{&pdu.ReleaseRQ{}, &pdu.ReleaseRP{}, &pdu.Abort{Source: pdu.AbortSourceServiceUser, Reason: pdu.AbortReasonNotSpecified}} {
 		encoded, err := p.Encode()
 		if err != nil {
 			t.Fatalf("encode %T: %v", p, err)
 		}
-		if _, err := ReadPDU(bytes.NewReader(encoded)); err != nil {
+		if _, err := pdu.ReadPDU(bytes.NewReader(encoded)); err != nil {
 			t.Fatalf("read %T: %v", p, err)
 		}
 	}
