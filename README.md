@@ -1,5 +1,11 @@
 # godicom
 
+[![CI](https://github.com/pravesh707/go-dicom/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/pravesh707/go-dicom/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/pravesh707/go-dicom.svg)](https://pkg.go.dev/github.com/pravesh707/go-dicom)
+[![Go Report Card](https://goreportcard.com/badge/github.com/pravesh707/go-dicom)](https://goreportcard.com/report/github.com/pravesh707/go-dicom)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/pravesh707/go-dicom)](go.mod)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
 A from-scratch, concurrency-first **DICOM networking library for Go**, inspired
 by [pynetdicom](https://pydicom.github.io/pynetdicom/stable/). It implements the
 DICOM Upper Layer protocol (PS3.8), ACSE association negotiation, and the DIMSE
